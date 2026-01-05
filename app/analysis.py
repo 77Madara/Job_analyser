@@ -2,29 +2,41 @@
 from transformers import pipeline
 from sentence_transformers import SentenceTransformer, util
 
-# 1. Load a pretrained Sentence Transformer model
+# 1. Load a pretrained model
 embed = SentenceTransformer("all-MiniLM-L6-v2")
 
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 ner = pipeline("token-classification", model="dslim/bert-base-NER")
 
 
 
 
-def summarize_text(text):
-    """
-    Résume le texte fourni en utilisant le modèle BART.
-    Utilise un modèle de summarization pré-entraîné pour générer un résumé.
+def build_summary(axes, profile_type, level):
+
     
-    Args:
-        text (str): Le texte à résumer
+    final_text = f"{profile_type} oriented profile"
+
     
-    Returns:
-        list: Une liste contenant le résumé du texte
-    """
-    resume = summarizer(text)
-    return resume
+    strong_axes = []
+    for axis, value in axes.items():
+        if value >= 3:
+            strong_axes.append(axis)
+
+   
+    if "ml" in strong_axes:
+        final_text += " with a specialization in Machine Learning"
+    elif "cloud" in strong_axes:
+        final_text += " with a strong Cloud orientation"
+    elif "backend" in strong_axes:
+        final_text += " specialized in Backend Development"
+
+
+    if level == "advanced":
+        final_text += " and solid professional experience"
+    elif level == "junior":
+        final_text += " at beginner level"
+
+    return final_text
 
 
 
@@ -133,6 +145,8 @@ def extract(text):
         skill_norm = corrections.get(skill_norm, skill_norm)
         if len(skill_norm) < 3 or skill_norm in skills_seen:
             continue
+        if skill_norm in ["fast", "api"]:
+            continue
         skills_cleaned.append(skill_norm)
         skills_seen.add(skill_norm)
 
@@ -192,6 +206,13 @@ def reference_profiles():
         "skills": ["aws", "azure", "gcp", "docker", "kubernetes", "ci/cd", "linux", "infrastructure" ]
     })
 
+    profiles.append({
+        "name": "Frontend Developer",
+        "skills": ["html", "css", "javascript", "React", "Tailwind", "Bootstrap", "Typescript", "Angulat", "svelte",
+                   "figma", "ui/ux" ]
+    })
+
+
     for profile in profiles:
         profile["vector"] = embed.encode(profile["skills"])
 
@@ -238,6 +259,11 @@ def skill_category(skill):
         "django", "fastapi", "flask", "api", "rest", "graphql"
     ]
 
+    frontend_skills = [
+        "html", "css", "javascript", "React", "Tailwind", "Bootstrap", "Typescript", "Angulat", "svelte",
+                   "figma", "ui/ux"
+    ]
+
     ml_skills = [
         "machine learning", "tensorflow", "pytorch",
         "deep learning", "nlp", "computer vision"
@@ -259,6 +285,9 @@ def skill_category(skill):
 
     if skill in backend_skills:
         return "backend"
+    
+    if skill in frontend_skills:
+        return "frontend"
 
     if skill in ml_skills:
         return "ml"
@@ -302,6 +331,28 @@ def analyze_axes(skills):
 
     return axes
 
+
+
+def profile_from_axes(axes):
+
+    if axes["ml"] >= 3:
+        return "Machine Learning Engineer"
+    
+    if axes["data"] >= 3:
+        return "Data Analyst"
+    
+    if axes["backend"] >= 3:
+        return "Backend Developer"
+    
+    if axes["frontend"] >= 3:
+        return "Frontend Developer"
+    
+    if axes["cloud"] >= 3:
+        return "Cloud Engineer"
+    
+    return "Hybrid / Generalist"
+
+
 def base_score(profile_type):
     """
     Attribue un score de base selon le type de profil.
@@ -315,6 +366,9 @@ def base_score(profile_type):
     """
     if profile_type == "Backend Developer":
         return 40
+    
+    if profile_type == "Frontend Developer":
+        return 38
 
     if profile_type == "Fullstack Developer":
         return 45
@@ -483,12 +537,18 @@ def analyze_profile(text):
             - score: Score global du profil
     """
     skills = extract(text)
-
-    profile_vector = embed.encode(skills)
-    profile_type = classify_profile(profile_vector)
-    level = estimate_level(skills)
     axes = analyze_axes(skills)
-    summary = summarize_text(text)
+
+    profile_type = profile_from_axes(axes)
+
+    if profile_type == "Hybrid / Generalist":
+
+        profile_vector = embed.encode(skills)
+        profile_type = classify_profile(profile_vector)
+    
+    level = estimate_level(skills)
+    
+    summary = build_summary(axes, profile_type, level)
     score = compute_score(skills, profile_type, level)
 
     return {

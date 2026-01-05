@@ -1,4 +1,14 @@
 from pydantic import BaseModel
 
-class Text(BaseModel):
-    job_description = str
+#Schéma d'entrée
+class ProfileRequest(BaseModel):
+    text: str
+
+# Schéma de sortie (optionnel mais pro)
+class ProfileResponse(BaseModel):
+    summary: list
+    skills: list
+    profile_type: str
+    level: str
+    axes: dict
+    score: int
